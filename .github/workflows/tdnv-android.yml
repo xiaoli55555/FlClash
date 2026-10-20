@@ -13,6 +13,7 @@ on:
       - pubspec.yaml
       - distribute_options.yaml
       - test/common/request_test.dart
+      - test/android_branding_test.dart
       - .github/workflows/tdnv-android.yml
 
 permissions:
@@ -112,7 +113,7 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Verify localization
-        run: flutter test test/l10n test/lint/dynamic_message_key_test.dart
+        run: flutter test test/l10n test/lint/dynamic_message_key_test.dart test/android_branding_test.dart
       - name: Build arm64 APK
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}

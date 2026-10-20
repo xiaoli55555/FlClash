@@ -107,7 +107,9 @@ jobs:
           set -euo pipefail
           for apk in dist/*.apk; do
             "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/tdnv-certificate.txt"
-            grep -qi 'Signer #1 certificate SHA-256 digest: c815dd5d5d67b4aad58e0eeb1c508dbf3a8ca3939d0a0512bfcbb1568b508456' "$RUNNER_TEMP/tdnv-certificate.txt"
+            certificate=$(awk '/certificate SHA-256 digest:/ {print tolower($NF)}' "$RUNNER_TEMP/tdnv-certificate.txt" | sort -u)
+            test "$certificate" = 'c815dd5d5d67b4aad58e0eeb1c508dbf3a8ca3939d0a0512bfcbb1568b508456'
+            mv "$apk" "${apk/FlClash-/tdnv-}"
           done
       - name: Upload APK
         uses: actions/upload-artifact@v4

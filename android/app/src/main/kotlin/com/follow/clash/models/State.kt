@@ -8,7 +8,7 @@ data class SharedState(
     val stopTip: String = "Stopping VPN...",
     val localNetworkTip: String =
         "Local network permission denied: using the gvisor stack, LAN is unreachable.",
-    val currentProfileName: String = "tdnv",
+    val currentProfileName: String = "TDNV",
     val stopText: String = "Stop",
     val onlyStatisticsProxy: Boolean = false,
     val showStopAction: Boolean = true,

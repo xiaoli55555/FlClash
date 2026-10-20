@@ -7,6 +7,9 @@ on:
     paths:
       - lib/**
       - android/**
+      - arb/**
+      - pubspec.yaml
+      - distribute_options.yaml
       - test/common/request_test.dart
       - .github/workflows/tdnv-android.yml
 
@@ -95,8 +98,12 @@ jobs:
           keytool -list -keystore android/app/keystore.jks -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null
       - name: Resolve dependencies
         run: flutter pub get
+      - name: Generate localized tdnv text
+        run: dart run intl_utils:generate
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+      - name: Verify localization
+        run: flutter test test/l10n test/lint/dynamic_message_key_test.dart
       - name: Build arm64 APK
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
@@ -109,7 +116,10 @@ jobs:
             "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/tdnv-certificate.txt"
             certificate=$(awk '/certificate SHA-256 digest:/ {print tolower($NF)}' "$RUNNER_TEMP/tdnv-certificate.txt" | sort -u)
             test "$certificate" = 'c815dd5d5d67b4aad58e0eeb1c508dbf3a8ca3939d0a0512bfcbb1568b508456'
-            mv "$apk" "${apk/FlClash-/tdnv-}"
+            target="${apk/FlClash-/tdnv-}"
+            if [ "$target" != "$apk" ]; then
+              mv "$apk" "$target"
+            fi
           done
       - name: Upload APK
         uses: actions/upload-artifact@v4

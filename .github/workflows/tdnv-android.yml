@@ -50,7 +50,14 @@ jobs:
           ndk-version: r28c
           link-to-sdk: true
       - name: Install Android build tools
-        run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager 'cmdline-tools;latest'
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$sdkmanager" --version
+          "$sdkmanager" --list
+          "$sdkmanager" 'platforms;android-37' 'build-tools;37.0.0'
       - name: Fetch CA certificates
         shell: bash
         run: |

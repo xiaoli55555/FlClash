@@ -20,24 +20,6 @@ class _StalledHttpClient extends Fake implements HttpClient {
       Completer<HttpClientRequest>().future;
 }
 
-class _HostAdapter implements HttpClientAdapter {
-  _HostAdapter(this.byHost);
-
-  final Map<String, ResponseBody Function()> byHost;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    return byHost[options.uri.host]!();
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -69,56 +51,19 @@ void main() {
     );
   });
 
-  group('latestRelease', () {
-    Request requestAnswering(Map<String, ResponseBody Function()> byHost) {
-      return Request()..dio.httpClientAdapter = _HostAdapter(byHost);
-    }
-
-    test('reads the release from the API', () async {
-      final request = requestAnswering({
-        'api.github.com': () => ResponseBody.fromString(
-          '{"tag_name":"v1.2.3","body":"notes"}',
-          200,
-          headers: {
-            Headers.contentTypeHeader: [Headers.jsonContentType],
-          },
-        ),
-      });
-
-      expect(await request.latestRelease(), {
-        'tag_name': 'v1.2.3',
-        'body': 'notes',
-      });
-    });
-
-    test(
-      'falls back to the release page when the API is rate limited',
-      () async {
-        final request = requestAnswering({
-          'api.github.com': () => ResponseBody.fromString('{}', 403),
-          'github.com': () => ResponseBody.fromString(
-            '',
-            302,
-            headers: {
-              HttpHeaders.locationHeader: [
-                'https://github.com/owner/repo/releases/tag/v1.2.4',
-              ],
-            },
-          ),
-        });
-
-        expect(await request.latestRelease(), {'tag_name': 'v1.2.4'});
-      },
+  test('application updates do not issue network requests', () async {
+    final client = Request();
+    var requests = 0;
+    client.dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          requests++;
+          handler.reject(DioException(requestOptions: options));
+        },
+      ),
     );
-
-    test('fails instead of answering when neither endpoint does', () async {
-      final request = requestAnswering({
-        'api.github.com': () => ResponseBody.fromString('{}', 403),
-        'github.com': () => ResponseBody.fromString('', 503),
-      });
-
-      await expectLater(request.latestRelease(), throwsA(isA<DioException>()));
-    });
+    expect(await client.checkForUpdate(), isNull);
+    expect(requests, 0);
   });
 
   group('downloadTarget', () {

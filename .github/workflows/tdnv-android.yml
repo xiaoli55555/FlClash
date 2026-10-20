@@ -1,0 +1,101 @@
+name: Build tdnv Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - lib/**
+      - android/**
+      - test/common/request_test.dart
+      - .github/workflows/tdnv-android.yml
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28c
+          link-to-sdk: true
+      - name: Install Android build tools
+        run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0'
+      - name: Fetch CA certificates
+        shell: bash
+        run: |
+          bundle=core/Clash.Meta/component/ca/ca-certificates.crt
+          curl -fsSL --retry 3 -o "$bundle" https://curl.se/ca/cacert-2026-09-25.pem
+          echo "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505  $bundle" | sha256sum -c -
+      - name: Configure fixed signing when available
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo '::notice::No fixed signing secrets configured. Building a debug-signed test APK only.'
+            exit 0
+          fi
+          test -n "$KEY_ALIAS"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
+          python3 - <<'PYTHON'
+          import os
+          from pathlib import Path
+          def escape(value):
+              return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace(' ', '\\ ')
+          values = {'keyAlias': os.environ['KEY_ALIAS'], 'storePassword': os.environ['STORE_PASSWORD'], 'keyPassword': os.environ['KEY_PASSWORD']}
+          with Path('android/local.properties').open('a') as output:
+              output.write('\n')
+              for key, value in values.items():
+                  output.write(f'{key}={escape(value)}\n')
+          PYTHON
+          keytool -list -keystore android/app/keystore.jks -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Build arm64 APK
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: dart setup.dart android --arch arm64 --env stable -v
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tdnv-android-arm64-test
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14

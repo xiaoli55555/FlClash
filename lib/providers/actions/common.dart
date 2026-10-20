@@ -149,13 +149,7 @@ class CommonAction extends _$CommonAction {
         confirmText: currentAppLocalizations.goDownload,
         cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
       );
-      if (res == true) {
-        unawaited(
-          launchUrl(
-            Uri.parse('https://github.com/$repository/releases/latest'),
-          ),
-        );
-      } else if (!isUser && res == false) {
+      if (!isUser && res == false) {
         ref
             .read(appSettingProvider.notifier)
             .update((state) => state.copyWith(autoCheckUpdate: false));

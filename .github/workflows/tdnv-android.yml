@@ -55,7 +55,7 @@ jobs:
           bundle=core/Clash.Meta/component/ca/ca-certificates.crt
           curl -fsSL --retry 3 -o "$bundle" https://curl.se/ca/cacert-2026-09-25.pem
           echo "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505  $bundle" | sha256sum -c -
-      - name: Configure fixed signing when available
+      - name: Configure required fixed signing
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
@@ -65,8 +65,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo '::notice::No fixed signing secrets configured. Building a debug-signed test APK only.'
-            exit 0
+            echo '::error::Fixed signing is required. Configure KEYSTORE, KEY_ALIAS, STORE_PASSWORD and KEY_PASSWORD repository secrets.'
+            exit 1
           fi
           test -n "$KEY_ALIAS"
           test -n "$STORE_PASSWORD"
@@ -95,7 +95,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: tdnv-android-arm64-test
+          name: tdnv-android-arm64-signed
           path: dist/*.apk
           if-no-files-found: error
           retention-days: 14

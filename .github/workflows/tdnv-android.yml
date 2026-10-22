@@ -124,6 +124,10 @@ jobs:
           set -euo pipefail
           for apk in dist/*.apk; do
             "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/tdnv-certificate.txt"
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs --min-sdk-version 23 --max-sdk-version 23 "$apk" > "$RUNNER_TEMP/tdnv-v1-certificate.txt"
+            grep -Fq 'Verified using v1 scheme (JAR signing): true' "$RUNNER_TEMP/tdnv-v1-certificate.txt"
+            v1_certificate=$(awk '/certificate SHA-256 digest:/ {print tolower($NF)}' "$RUNNER_TEMP/tdnv-v1-certificate.txt" | sort -u)
+            test "$v1_certificate" = 'c815dd5d5d67b4aad58e0eeb1c508dbf3a8ca3939d0a0512bfcbb1568b508456'
             certificate=$(awk '/certificate SHA-256 digest:/ {print tolower($NF)}' "$RUNNER_TEMP/tdnv-certificate.txt" | sort -u)
             test "$certificate" = 'c815dd5d5d67b4aad58e0eeb1c508dbf3a8ca3939d0a0512bfcbb1568b508456'
             target="${apk/FlClash-/tdnv-}"
